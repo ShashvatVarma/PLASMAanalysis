@@ -1,7 +1,14 @@
+#old imports
+r"""
 from FLASHtools.read_flash import Fields
 import FLASHtools.aux_funcs.power_spectra_funcs as ps
 import FLASHtools.aux_funcs.derived_var_funcs as dv
-import FLASHtools.aux_funcs.create_video as video
+"""
+from PLASMAtools.read_funcs.read import Fields
+import PLASMAtools.aux_funcs.power_spectra_funcs as ps
+import PLASMAtools.aux_funcs.derived_var_funcs as dv
+import PLASMAanalysis.create_video as video
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 from fractions import Fraction as frac
@@ -101,9 +108,10 @@ def energy_evolution(max_timestep, directory, filename='none'):
         turb.read('dens')
         turb.read('vel')
         turb.read('mag')
-
+        mag_vector = turb.mag
+        vel_vector = turb.vel
         #compute ave energy ratio 
-        ratio = energy_density_ratio([turb.magx, turb.magy, turb.magz], [turb.velx, turb.vely, turb.velz], turb.dens, Mean = True)
+        ratio = energy_density_ratio(mag_vector, vel_vector, turb.dens, Mean = True)
         return([i, ratio])
 
     #perform the parallelized computation
