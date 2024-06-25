@@ -30,7 +30,7 @@ def animation_frame(base_directory, identifier):
         Integer identifier for the image, telling the create_video function what frame the image is.
 
     """
-    temp_directory = f'{base_directory}temp_images\\'  #temporary directory to store images    
+    temp_directory = f'{base_directory}temp_images/'  #temporary directory to store images    
     #check if the directory exists, and clear it
     if not os.path.exists(temp_directory):
         clear_temp(temp_directory)
@@ -54,7 +54,7 @@ def create_video(base_dir, output_name, fps):
     fps : int
         Frames per second of the video.
     """
-    temporary_dir = f'{base_dir}temp_images\\'     
+    temporary_dir = f'{base_dir}temp_images/'     
     #create 
     #generate the image names to make the video from
     call(['ffmpeg','-y','-framerate', f'{fps}', '-i', f"{temporary_dir}image%d.png", '-pix_fmt', 'yuv420p', f'{base_dir}{output_name}.mp4'])
