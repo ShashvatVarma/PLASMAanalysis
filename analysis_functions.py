@@ -1,9 +1,3 @@
-#old imports
-r"""
-from FLASHtools.read_flash import Fields
-import FLASHtools.aux_funcs.power_spectra_funcs as ps
-import FLASHtools.aux_funcs.derived_var_funcs as dv
-"""
 from PLASMAtools.read_funcs.read import Fields
 import PLASMAtools.aux_funcs.power_spectra_funcs as ps
 import PLASMAtools.aux_funcs.derived_var_funcs as dv
