@@ -21,6 +21,9 @@ from joblib import Parallel, delayed
 #CORES TO BE USED IN COMPUTATIONS
 cores = 5
 
+#DEFINE THE GLOBAL DERIVEDVARS OBJECT
+dvar = dv.DerivedVars()
+
 class DataLoader:
     def __init__(self, filepath, i, space=False):
         filename = 	str('Turb_hdf5_plt_cnt_') + str(str("%0" + str(4) +"d") % i)
@@ -111,7 +114,7 @@ def energy_evolution(max_timestep, directory, filename='none'):
         mag_vector = turb.mag
         vel_vector = turb.vel
         #compute ave energy ratio 
-        ratio = energy_density_ratio(mag_vector, vel_vector, turb.dens, Mean = True)
+        ratio = energy_density_ratio(mag_vector, vel_vector, turb.dens[0], Mean = True)
         return([i, ratio])
 
     #perform the parallelized computation
@@ -211,9 +214,9 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
         turb.read('vel')
         turb.read('mag')
         #compute energy ratio
-        mag_vector = [turb.magx, turb.magy, turb.magz]
-        vel_vector = [turb.velx, turb.vely, turb.velz]
-        energy_ratio = energy_density_ratio(mag_vector, vel_vector, turb.dens)
+        mag_vector = turb.mag
+        vel_vector = turb.vel
+        energy_ratio = energy_density_ratio(mag_vector, vel_vector, turb.dens[0])
         #find minimum and maximum
         return([np.min(energy_ratio), np.max(energy_ratio)])
     result = Parallel(n_jobs=cores)(delayed(find_minmax)(i) for i in np.arange(1,max_timestep+1))
@@ -235,19 +238,16 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
 
         if quiver == True:
             turb.derived_var('cur')
-        #compute mag energy
-        mag_energy = (turb.magx**2 + turb.magy**2 + turb.magz**2)/(8*np.pi)
-        
-        #compute kin energy
-        kin_energy = (1/2)*(turb.velx**2 + turb.vely**2 + turb.velz**2)*turb.dens
-        
-        #determine ratio
-        energy_density = mag_energy/kin_energy
+            cur_vector = turb.cur
+        mag_vector = turb.mag
+        vel_vector = turb.vel
+        #compute energy ratio
+        energy_density = energy_density_ratio(mag_vector, vel_vector, turb.dens[0])
 
         #create slice of both energy as well as direction of B fields, assumes box is square
         #define direction arrays for streamplot/quiverplot
-        direction1 = np.arange(0,np.shape(turb.magx)[0])
-        direction2 = np.arange(0,np.shape(turb.magx)[1])
+        direction1 = np.arange(0,np.shape(mag_vector[0])[0])
+        direction2 = np.arange(0,np.shape(mag_vector[0])[1])
 
         
         #create the plot                               
@@ -257,11 +257,11 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
             #plot either quiver or streamline
             if quiver == True:
                 #normalize vectors being used
-                turb.magy, turb.magz = Normalize_2d(turb.magy, turb.magz)
-                turb.cury, turb.curz = Normalize_2d(turb.cury, turb.curz)
+                mag_vector[1], mag_vector[2] = Normalize_2d(mag_vector[1], mag_vector[2])
+                cur_vector[1], cur_vector[2] = Normalize_2d(cur_vector[1], cur_vector[2])
                 #plot   
-                ax.quiver(direction1[skip], direction2[skip], turb.magy[slice_value,skip,skip], turb.magz[slice_value,skip,skip], color = 'green', linewidth = 2)
-                ax.quiver(direction1[skip], direction2[skip], turb.cury[slice_value,skip,skip], turb.curz[slice_value,skip,skip], color = 'blue', linewidth = 2)
+                ax.quiver(direction1[skip], direction2[skip], mag_vector[1][slice_value,skip,skip], mag_vector[2][slice_value,skip,skip], color = 'green', linewidth = 2)
+                ax.quiver(direction1[skip], direction2[skip], cur_vector[1][slice_value,skip,skip], cur_vector[2][slice_value,skip,skip], color = 'blue', linewidth = 2)
             #elif quiver == False:
                 
                 #ax.streamplot(direction1, direction2, turb.magy[slice_value,:,:], turb.magz[slice_value,:,:], color = 'red', density = 1.5)
@@ -274,12 +274,11 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
             #plot either quiver or streamline
             if quiver == True:
                 #normalize vectors being used
-                turb.magx, turb.magz = Normalize_2d(turb.magx, turb.magz)
-                turb.curx, turb.curz = Normalize_2d(turb.curx, turb.curz)
+                mag_vector[0], mag_vector[2] = Normalize_2d(mag_vector[0], mag_vector[2])
+                cur_vector[0], cur_vector[2] = Normalize_2d(cur_vector[0], cur_vector[2])
                 #plot
-                ax.quiver(direction1[skip], direction2[skip], turb.magx[slice_value,skip,skip], turb.magz[slice_value,skip,skip], color = 'green', linewidth = 2)
-                ax.quiver(direction1[skip], direction2[skip], turb.curx[slice_value,skip,skip], turb.curz[slice_value,skip,skip], color = 'blue', linewidth = 2)
-            #elif quiver == False:
+                ax.quiver(direction1[skip], direction2[skip], mag_vector[0][slice_value,skip,skip], mag_vector[2][slice_value,skip,skip], color = 'green', linewidth = 2)
+                ax.quiver(direction1[skip], direction2[skip], cur_vector[0][slice_value,skip,skip], cur_vector[2][slice_value,skip,skip], color = 'blue', linewidth = 2)
                 #ax.streamplot(direction1, direction2, turb.magx[:,slice_value,:], turb.magz[:,slice_value,:], color = 'red', density = 1.5)
             
             ax.set_xlabel("X component")
@@ -290,11 +289,11 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
             #plot either quiver or steamline
             if quiver == True:
                 #normalize vectors being used
-                turb.magx, turb.magy = Normalize_2d(turb.magx, turb.magy)
-                turb.curx, turb.cury = Normalize_2d(turb.curx, turb.cury)
+                mag_vector[0], mag_vector[1] = Normalize_2d(mag_vector[0], mag_vector[1])
+                cur_vector[0], cur_vector[1] = Normalize_2d(cur_vector[0], cur_vector[1])
                 #plot
-                ax.quiver(direction1[skip], direction2[skip], turb.magx[slice_value,skip,skip], turb.magy[slice_value,skip,skip], color = 'green', linewidth = 2)
-                ax.quiver(direction1[skip], direction2[skip], turb.curx[slice_value,skip,skip], turb.cury[slice_value,skip,skip], color = 'blue', linewidth = 2)
+                ax.quiver(direction1[skip], direction2[skip], mag_vector[0][slice_value,skip,skip], mag_vector[1][slice_value,skip,skip], color = 'green', linewidth = 2)
+                ax.quiver(direction1[skip], direction2[skip], cur_vector[0][slice_value,skip,skip], cur_vector[1][slice_value,skip,skip], color = 'blue', linewidth = 2)
             #elif quiver == False:
                 #ax.streamplot(direction1, direction2, turb.magx[:,:,slice_value], turb.magy[:,:,slice_value], color = 'red', density = 1.5)
             
@@ -326,7 +325,7 @@ def Animate_Energy2D(max_timestep, directory, slice_axis, slice_value, fps_value
     elif quiver == False:
         title = 'streamline_animation'
 
-    video.create_video(1,max_timestep, [], f"{directory}", title, fps_value)
+    video.create_video(f"{directory}", title, fps_value)
 
 def compute_derivative(axis, data):
     """Will compute the derivative along the specified coordinate axis to the given data array.
@@ -473,11 +472,11 @@ def angle_pdf(filepath, timesteps, bins, animate = False):
         ax.xaxis.set_major_locator(MultipleLocator(base=ticklen))
 
         print(f"Analyzing frame {i}...")
-        filename = 	str('Turb_hdf5_plt_cnt_') + str(str("%0" + str(4) +"d") % i)
-        #read data
-        turb = Fields(str(filepath) + filename, reformat = True)
-        turb.derived_var("bj_angle")
-        angle = turb.bj_angle
+        data = DataLoader(filepath,i)
+        turb = data.turb
+        turb.derived_var("cur")
+        turb.read("mag")
+        angle = vector_angle(turb.cur, turb.mag)
 
         #flatten the angle array
         angle = angle.flatten()
@@ -500,7 +499,7 @@ def angle_pdf(filepath, timesteps, bins, animate = False):
     #perform the parallelized computation
     Parallel(n_jobs=cores)(delayed(analyze_frame)(i) for i in timesteps)
     if animate == True:
-        video.create_video(timesteps[0],timesteps[-1], [], f"{filepath}", 'angle_pdf', 10)
+        video.create_video(f"{filepath}", 'angle_pdf', 10)
 
 def abs_k_peak(k_array, intensity_array, gridsize=64):
     #DEFINES NUMBER OF POINTS TO CONSIDER ON EACH SIDE OF GLOBAL MAX
@@ -530,9 +529,7 @@ def abs_k_peak(k_array, intensity_array, gridsize=64):
     max_index = model.index(np.max(model))
     return continuous_array[max_index], [continuous_array, model]
 
-
-
-def compute_power_spectra(filepath, timesteps, quantity, yrange, animate = False, check_scaling=False, power = 0):
+def new_power_spectra(filepath, timesteps, quantity, yrange, animate = False):
     """Creates the 1D power spectra of a quantity for a list of timesteps. If animate is false, result is a plot of the different
     timesteps. If animate is true, result is an animation of the different timesteps.
     If check_scaling = True, will plot power spectra divided by k^power to understand k scaling of the power spectrum
@@ -552,184 +549,89 @@ def compute_power_spectra(filepath, timesteps, quantity, yrange, animate = False
          overlayed. by default False
     yrange : array
         yrange of plot
-    check_scaling : bool, optional
-        If true, will plot power spectra divided by k^power. False by default
-    power : float, optional
-        Power to divide k by, only needed when check_scaling = True. 0 by default
+
     """
-    #enjoy the most poorly written script of all time :)
+    if animate:
+        def create_frame(i):
+            print(f"Analyzing frame {i}...")
+            fig = plt.figure(figsize=(11,5))
+            plt.xlabel(r"$$kL/2\pi$$")
+            plt.ylabel("Power")
+            plt.ylim(yrange[0],yrange[1])
+            
+            #load in data
+            data = DataLoader(filepath,i)
+            turb = data.turb
+            
+            if quantity == 'both':
+                turb.read('mag')
+                turb.read('vel')
+                turb.read('dens')
 
-    allowed_quantities = ['mag_energy', 'kin_energy', 'both']
+                #generate the power spectra
+                k_array_mag, intensity_mag = mag_spectrum(turb.mag)
+                k_array_kin, intensity_kin = kin_spectrum(turb.vel, turb.dens[0])
+                plt.loglog(k_array_mag, intensity_mag, label = "$\mathcal{E}_{\rm{mag},k}$")
+                plt.loglog(k_array_kin, intensity_kin, label = "$\mathcal{E}_{\rm{kin},k}$")
+                plt.legend()
+            
+            elif quantity == 'mag_energy':
+                turb.read('mag')
+                k_array, intensity = mag_spectrum(turb.mag)
+                plt.loglog(k_array, intensity, label = "$\mathcal{E}_{\rm{mag},k}$")
+            
+            elif quantity == 'kin_energy':
+                turb.read('vel')
+                turb.read('dens')
+                k_array, intensity = kin_spectrum(turb.vel, turb.dens[0])
+                plt.loglog(k_array, intensity, label = "$\mathcal{E}_{\rm{kin},k}$")
+            
+            plt.title(f"Power Spectrum at $t = {i/100}t_0$")
 
+            #save the frame
+            video.animation_frame(f"{filepath}",i)
+            #clear figures
+            fig.clear()
+            plt.close(fig)
+        
+        #clear temp directory
+        video.clear_temp(base_directory=f"{filepath}")
+        #generate the frames
+        Parallel(n_jobs=cores)(delayed(create_frame)(i) for i in timesteps)
+        #create the animation
+        video.create_video(f"{filepath}", f'power_spectra_{quantity}', 10)
     
+    elif not animate:
+        plt.figure(figsize=(11,5))
+        plt.xlabel(r"$$kL/2\pi$$")
+        plt.ylabel("Power")
+        plt.ylim(yrange[0],yrange[1])
+        color_list_mag = linear_gradient("#85FFFF", "#1300FF", len(timesteps))['hex']
+        color_list_kin = linear_gradient("#FF6A6A", "#FF0000", len(timesteps))['hex']
+        for i in timesteps:
+            print(f"Analyzing frame {i}")
+            data = DataLoader(filepath,i)
+            turb = data.turb
 
-    #load data
-
-    #for i in timesteps:
-    def analyze_frame(i):
-        fig = plt.figure(figsize=(11,5))
-        print("Analyzing frame " + str(i) + " of " + str(timesteps[-1]) + "...")
-        data = 	DataLoader(filepath,i)
-        turb = data.turb
+            if quantity == 'mag_energy':
+                savestring = "$\mathcal{E}_{mag}$"
+                turb.read('mag')
+                k_array, intensity = mag_spectrum(turb.mag)
+                plt.loglog(k_array, intensity, color = color_list_mag[timesteps.index(i)])
+            
+            elif quantity == 'kin_energy':
+                savestring = "$\mathcal{E}_{kin}$"
+                turb.read('vel')
+                turb.read('dens')
+                k_array, intensity = kin_spectrum(turb.vel, turb.dens[0])
+                plt.loglog(k_array, intensity, color = color_list_kin[timesteps.index(i)])
+            
+            elif quantity == 'both':
+                Warning("Function does not support plotting both due to clutter.")
         
-        if quantity not in allowed_quantities:
-            raise ValueError("quantity must be 'mag_energy', 'kin_energy', or 'both'")
-        elif quantity == 'mag_energy':
-            #load and compute necessary quantity
-            turb.read("mag")
-            k_array, intensity = mag_spectrum([turb.magx, turb.magy, turb.magz])
-            #additionally, compute the taylor microscale before renormalization
-            #compute the taylor microscale
-            numerator = np.trapz((k_array**2)*intensity, k_array)
-            denominator = np.trapz(intensity, k_array)
-            result = np.sqrt(numerator/denominator)
-
-            #intensity = normalize_spectrum(k_array, intensity)
-            #plot spectra according to if animation needed or not
-            if animate == False:
-                if check_scaling == True:
-                    plt.loglog(k_array, intensity/(k_array **power), label = str(i/100) + "$t_0$")
-                else:
-                    plt.loglog(k_array, intensity, label = str(i/100) + "$t_0$")
-            if animate == True:
-                plt.xlim(1,100)
-                plt.ylim(yrange[0],yrange[1])
-                absolute_peak, model = abs_k_peak(k_array, intensity)
-                modelx = model[0]
-                modely = model[1]
-                plt.axvline(absolute_peak, color = 'black', linestyle = 'dashed', label = "Absolute Peak")
-                plt.plot(modelx, modely, color = 'red', linestyle = 'dashed')
-                if check_scaling == True:
-                    plt.loglog(k_array, intensity/(k_array **power), color = "black")
-                    plt.text(0.02, 1.08, r"$\mathcal{E}_{\rm mag}/k^{"+ str(round(power,3))+ r"}$ Power Spectrum at $t = $" + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                else:
-                    plt.loglog(k_array, intensity, color = "black")
-                    plt.text(0.02, 1.08, r"$\mathcal{E}_{\rm mag}$ Power Spectrum at $t = $" + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                #generate the image frame
-                video.animation_frame(f"{filepath}",i)
-        elif quantity == 'kin_energy':
-            #load and compute necessary quantity
-            turb.read("vel")
-            turb.read("dens")
-            #set initial density
-            if i == timesteps[0]:
-                density = np.mean(turb.dens)
-            #compute spectra
-            k_array, intensity = kin_spectrum([turb.velx, turb.vely, turb.velz], density)
-            #additionally, compute the taylor microscale before renormalization
-            #compute the taylor microscale
-            numerator = np.trapz((k_array**2)*intensity, k_array)
-            denominator = np.trapz(intensity, k_array)
-            result = np.sqrt(numerator/denominator)
-
-            intensity = normalize_spectrum(k_array, intensity)
-            #plot spectra according to if animation needed or not
-            if animate == False:
-                if check_scaling == True:
-                    plt.loglog(k_array, intensity/(k_array **power), label = str(i/100) + "$t_0$")
-                else:
-                    plt.loglog(k_array, intensity, label = str(i/100) + "$t_0$")
-            if animate == True:
-                plt.xlim(1,100)
-                plt.ylim(yrange[0],yrange[1])
-                plt.axvline(result, color = 'black', linestyle = 'dashed', label = "Taylor Microscale")
-                if check_scaling == True:
-                    plt.loglog(k_array, intensity/(k_array **power), color = "black")
-                    plt.text(0.02, 1.08, r"$\mathcal{E}_{\rm kin}/k^{" + str(round(power,3)) + r"}$ Power Spectrum at $t = $" + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                else:
-                    plt.loglog(k_array, intensity, color = "black")
-                    plt.text(0.02, 1.08, r"$\mathcal{E}_{\rm kin}$ Power Spectrum at $t = $" + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                #generate the image frame
-                video.animation_frame(f"{filepath}",i)
-        elif quantity == 'both':
-            #load and compute necessary quantity
-            turb.read("mag")
-            turb.read("vel")
-            turb.read("dens")
-            #set initial density
-            if i == timesteps[0]:
-                density = np.mean(turb.dens)
-            #compute spectra            
-            k_array_mag, intensity_mag = mag_spectrum([turb.magx, turb.magy, turb.magz]) 
-            #k_array_mag,intensity_magf = mag_spectrum([turbf.magx, turbf.magy, turbf.magz])
-            #k_array_mag,intensity_magb = mag_spectrum([turbb.magx, turbb.magy, turbb.magz])
-            #intensity_mag = (intensity_mag + intensity_magf + intensity_magb)/3
-            #intensity_mag = normalize_spectrum(k_array_mag, intensity_mag)
-
-            k_array_kin, intensity_kin = kin_spectrum([turb.velx, turb.vely, turb.velz], density)
-            #k_array_kin,intensity_kinf = kin_spectrum([turbf.velx, turbf.vely, turbf.velz], density)
-            #k_array_kin,intensity_kinb = kin_spectrum([turbb.velx, turbb.vely, turbb.velz], density)
-            #intensity_kin = (intensity_kin + intensity_kinf + intensity_kinb)/3
-            #intensity_kin = normalize_spectrum(k_array_kin, intensity_kin)
-
-            #compute the taylor microscales
-            '''
-            numerator = np.trapz((k_array_mag**2)*intensity_mag, k_array_mag)
-            denominator = np.trapz(intensity_mag, k_array_mag)
-            result_mag = np.sqrt(numerator/denominator)
-
-            numerator = np.trapz((k_array_kin**2)*intensity_kin, k_array_kin)
-            denominator = np.trapz(intensity_kin, k_array_kin)
-            result_kin = np.sqrt(numerator/denominator)
-            '''
-            #plot spectra according to if animation needed or not
-            if animate == False:
-                if check_scaling == True: 
-                    plt.loglog(k_array_mag, intensity_mag/(k_array**power), label = str(i/100) + "$t_0$", linestyle = 'dashed', color = 'black')
-                    plt.loglog(k_array_kin, intensity_kin/(k_array**power), label = str(i/100) + "$t_0$", linestyle = 'solid', color = 'blue')
-                else:
-                    color_list_mag = linear_gradient("#0abeff", "#3b0aff", len(timesteps))['hex']
-                    color_list_kin = linear_gradient("#ff9494", "#bd0000", len(timesteps))['hex']
-                    plt.loglog(k_array_mag, intensity_mag*1e10, label = str(i/100) + "$t_0$", linestyle = 'solid', color = color_list_mag[timesteps.index(i)])
-                    #plt.axvline(result_mag, color = color_list_mag[timesteps.index(i)], linestyle = 'dotted')
-                    plt.loglog(k_array_kin, intensity_kin*1e-3, label = str(i/100) + "$t_0$", linestyle = 'solid', color = color_list_kin[timesteps.index(i)])
-                    #plt.axvline(result_kin, color = color_list_kin[timesteps.index(i)], linestyle = 'dotted')
-            if animate == True:
-                plt.xlim(1,np.size(k_array_mag)+5)
-                plt.ylim(yrange[0],yrange[1])
-                if check_scaling == True:
-                    plt.loglog(k_array_mag, intensity_mag/(k_array**power), color = "black")
-                    plt.loglog(k_array_kin, intensity_kin/(k_array**power), color = "blue")
-                    plt.text(0.02, 1.08, r"Power Spectra with $\mathcal{E}_{\rm mag}/k^{" + str(round(power,3)) \
-                             + r"}$ = Black, $\mathcal{E}_{\rm kin}/k^{" + str(round(power,3)) + "}$ = Blue at $t = $" \
-                                + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                else:
-                    plt.loglog(k_array_mag, intensity_mag*1e10, color = "black")
-                    plt.loglog(k_array_kin, intensity_kin, color = "blue")
-                    plt.text(0.02, 1.08, r"Power Spectra with $\mathcal{E}_{\rm mag}$ = Black, $\mathcal{E}_{\rm kin}$ = Blue at $t = $" \
-                         + str(i/100) + "$t_0$", transform=plt.gca().transAxes, verticalalignment='top')
-                #generate the image frame
-                video.animation_frame(f"{filepath}",i)
-        #clear the figure
-        fig.clear()
-        plt.close(fig)
-    plt.xlabel(r"$$kL/2\pi$$")
-    plt.ylabel("Power")
-    #generate the images
-    Parallel(n_jobs=cores)(delayed(analyze_frame)(i) for i in timesteps)
-
-
-    if check_scaling == True:
-        title_string = "k^" + str(power) + "-scaled Power Spectra of "
-        save_string = "k" + str(round(power,3))
-    else:
-        title_string = "Power Spectra of "
-        save_string = ""
-    if animate == True:
-        video.create_video(filepath, f'power_spectra_short128_{save_string}', 7)
-    else:
+        plt.title(f"Power Spectrum of {savestring}")
+        plt.savefig(f"{filepath}Plots\\power_spectra_{quantity}.pdf")
         plt.show()
-        
-    if quantity == 'mag_energy':
-        plt.title( str(title_string) + r"$\mathcal{E}_B$")
-    if quantity == 'kin_energy':
-        plt.title(str(title_string) + r"$\mathcal{E}_K$")
-    if quantity == 'both':
-        plt.title(str(title_string) + r"$\mathcal{E}_B$ (Blue) and $\mathcal{E}_K (Red)$")
-
-        plt.savefig(str(quantity) + '_power_spectra' + save_string + '.jpg', dpi=800)
-        plt.show()
-
 
 def mag_spectrum(mag_vector):
     """Returns the 1D magnetic energy spectrum. Done by computing the spectrum of each component square
@@ -740,18 +642,12 @@ def mag_spectrum(mag_vector):
     mag_vector : vector
         Magnetic energy vector in 3D
     """
-    #compute each component
-    mag_spectrumx = ps.compute_power_spectrum_3D(mag_vector[0])
-    mag_spectrumy = ps.compute_power_spectrum_3D(mag_vector[1])
-    mag_spectrumz = ps.compute_power_spectrum_3D(mag_vector[2])
-    #linearize to 1D spectrum
-    k_magx, intensity_magx = ps.radial_integrate(mag_spectrumx)
-    k_magy, intensity_magy = ps.radial_integrate(mag_spectrumy)
-    k_magz, intensity_magz = ps.radial_integrate(mag_spectrumz)
-    #assuming k arrays are the same, the spectra can just add
-    k_array = k_magx
-    intensity = (intensity_magx + intensity_magy + intensity_magz)/(8*np.pi)
-    return([k_array, intensity])
+    #compute 3d spectrum
+    mag_spectrum = ps.compute_power_spectrum_3D(mag_vector)
+    #integrate over sphere
+    k_mag, intensity_mag = ps.spherical_integrate(mag_spectrum)
+    intensity = intensity_mag/(8*np.pi)   #compute mag energy
+    return([k_mag, intensity])
 
 def kin_spectrum(vel_vector, density):
     """Returns the 1D kinetic energy spectrum. Done by computing the spectrum of each component square. Assumes density is constant
@@ -763,18 +659,12 @@ def kin_spectrum(vel_vector, density):
     density : scalar
         density of gas for kinetic energy
     """
-    #compute each component
-    kin_spectrumx = ps.compute_power_spectrum_3D(vel_vector[0])
-    kin_spectrumy = ps.compute_power_spectrum_3D(vel_vector[1])
-    kin_spectrumz = ps.compute_power_spectrum_3D(vel_vector[2])
-    #linearize to 1D spectrum
-    k_kinx, intensity_kinx = ps.radial_integrate(kin_spectrumx)
-    k_kiny, intensity_kiny = ps.radial_integrate(kin_spectrumy)
-    k_kinz, intensity_kinz = ps.radial_integrate(kin_spectrumz)
-    #assuming k arrays are the same, the spectra can just add
-    k_array = k_kinx
-    intensity = (intensity_kinx + intensity_kiny + intensity_kinz)*density/2
-    return([k_array, intensity])
+    #compute 3d spectrum
+    kin_spectrum = ps.compute_power_spectrum_3D(vel_vector)
+    #integrate over sphere
+    k_kin, intensity_kin = ps.spherical_integrate(kin_spectrum)
+    intensity = (intensity_kin)*np.mean(density)/2    #compute kinetic energy
+    return([k_kin, intensity])
 
 def normalize_spectrum(k_array, intensity_array):
     """Will normalize the power spectrum by dividing by integral of the power spectrum
@@ -821,22 +711,22 @@ def parsevel_check(filepath, timesteps, quantity, save=False, rho = 1):
             turb.read('vel')
 
             #compute the kinetic energy spectrum
-            k_array, intensity = kin_spectrum([turb.velx,turb.vely,turb.velz],rho)
+            k_array, intensity = kin_spectrum(turb.vel,rho)
             #compute the integral
             integral = np.trapz(intensity, k_array)
             #compute the mean velocity square
-            mean_vel2 = np.mean(turb.velx**2 + turb.vely**2 + turb.velz**2)
+            mean_vel2 = np.mean(turb.vel[0]**2 + turb.vel[1]**2 + turb.vel[2]**2)
             rhs = 0.5 * rho * mean_vel2    #computes rhs
             result = integral - rhs
         elif quantity == 'mag_energy':
             turb.read('mag')
 
             #compute the magnetic energy spectrum
-            k_array, intensity = mag_spectrum([turb.magx,turb.magy,turb.magz])
+            k_array, intensity = mag_spectrum(turb.mag)
             #compute the integral
             integral = np.trapz(intensity, k_array)
             #compute the mean magnetic field square
-            mean_mag2 = np.mean(turb.magx**2 + turb.magy**2 + turb.magz**2)
+            mean_mag2 = np.mean(turb.mag[0]**2 + turb.mag[1]**2 + turb.mag[2]**2)
             rhs = (1/(8*np.pi)) * mean_mag2
             result = integral - rhs
         return result
@@ -885,13 +775,13 @@ def bmag_theta_pdf(filepath, timesteps,x_limit,angle_quantity):
         data = DataLoader(filepath,i)
         turb = data.turb
         #compute angle
+        turb.read('mag')
         if angle_quantity == 'current':
-            turb.derived_var("bj_angle")
-            angle = turb.bj_angle
+            turb.derived_var("cur")
+            angle = vector_angle(turb.cur, turb.mag)
         elif angle_quantity == 'velocity':
             turb.read('vel')
-            turb.read('mag')
-            angle = vector_angle([turb.velx, turb.vely, turb.velz], [turb.magx, turb.magy, turb.magz])
+            angle = vector_angle(turb.vel, turb.mag)
         else:
             raise ValueError("angle_quantity must be 'current' or 'velocity'")
         #flatten the angle into 1D array
@@ -899,7 +789,7 @@ def bmag_theta_pdf(filepath, timesteps,x_limit,angle_quantity):
         
 
         #compute magnetic field magnitude ratio
-        bmag = np.sqrt(turb.magx**2 + turb.magy**2 + turb.magz**2)
+        bmag = np.sqrt(turb.mag[0]**2 + turb.mag[1]**2 + turb.mag[2]**2)
         bmag = bmag/np.sqrt(np.mean(bmag**2))
 
         #flatten the bmag into 1D array
@@ -958,9 +848,9 @@ def taylor_microscale(filepath, timesteps, quantity, save=False,check_velocity=F
         spectrum = np.array([])
         #compute power spectra
         if quantity == 'mag_energy':
-            k_array, spectrum = mag_spectrum([turb.magx, turb.magy, turb.magz])
+            k_array, spectrum = mag_spectrum(turb.mag)
         if quantity == 'kin_energy':
-            k_array, spectrum = kin_spectrum([turb.velx, turb.vely, turb.velz], 1)
+            k_array, spectrum = kin_spectrum(turb.vel, 1)
         
         #compute the taylor microscale
         numerator = np.trapz((k_array**2)*spectrum, k_array)
@@ -1022,7 +912,7 @@ def stretching_power_spectrum(filepath, timesteps, save=False):
         #initialize plot        
         fig = plt.figure()
         #compute the contraction
-        contraction = vel_grad_decomp(filepath, i)
+        contraction,_,_ = vel_grad_decomp(filepath, i)
 
         #compute the power spectrum of the contraction value
         spectrum = ps.compute_power_spectrum_3D(contraction)
@@ -1051,16 +941,16 @@ def vel_grad_decomp(filepath, i):
     #load the velocity field
     turb.read('vel')
     turb.read('mag')
-    velocity_field = np.array([turb.velx, turb.vely, turb.velz])
+    velocity_field = np.array(turb.vel)
 
     #compute the velocity gradient
-    vel_gradient = dv.gradient_tensor(velocity_field, order = 6) 
+    vel_gradient = dvar.gradient_tensor(velocity_field, order = 6) 
 
     #perform the decomposition into the bulk, symmetric, and antisymmetric tensors
-    sym, anti, bulk = dv.orthogonal_tensor_decomposition(vel_gradient)
+    sym, anti, bulk = dvar.orthogonal_tensor_decomposition(vel_gradient, sym=False, all=True )
 
     #find the mag field unit vectors
-    mag_field = np.array([turb.magx, turb.magy, turb.magz])
+    mag_field = np.array(turb.mag)
     mag_field_unit = mag_field/np.sqrt(dot_product(mag_field, mag_field))
 
     #next contract bibj
@@ -1117,13 +1007,13 @@ def solve_evp(directory,i):
     turb.read('mag')
 
     #compute the velocity gradient tensor
-    vel_gradient = dv.gradient_tensor(np.array([turb.velx, turb.vely, turb.velz]), order = 4)
+    vel_gradient = dvar.gradient_tensor(np.array(turb.vel), order = 4)
 
     #define the magnetic vector field
-    mag_vector = np.array([turb.magx, turb.magy, turb.magz])
+    mag_vector = np.array(turb.mag)
 
     #compute the eigenvalues
-    eigvals, eigvecs = dv.symmetric_eigvalsh(mag_vector, vel_gradient, find_vectors=True)
+    eigvals, eigvecs = dvar.symmetric_eigvals(mag_vector, vel_gradient, find_vectors=True)
 
     #separate eigenvalues into different arrays
     eig_compress = eigvals[0,:,:,:]
